@@ -1,0 +1,180 @@
+---
+title: "Data Preprocessing for Rat Inspection Dataset"
+author: "Jia Ji, Yijia Jiang, Gonghao Liu, Yifei Xu, Ziyan Xu"
+date: "2022-11-21"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(RSocrata)
+library(rnoaa)
+```
+
+
+First, read in the rat inspection dataset.
+```{r, message=FALSE, warning=FALSE}
+url_rat = "https://data.cityofnewyork.us/OData.svc/p937-wjvj"
+rat = read.socrata(url_rat) %>% 
+  janitor::clean_names() 
+```
+
+
+Then we clean the date and keep the records between 2013 and 2021. All missing data are dropped.
+```{r, message=FALSE, warning=FALSE}
+rat_tidy = rat %>%
+  select(inspection_type, bbl, zip_code, latitude, longitude, borough, result, inspection_date, approved_date) %>%
+  drop_na() %>% 
+  mutate(boro_code = substr(bbl, 1, 1),
+         block = substr(bbl, 2, 6),
+         lot = substr(bbl, 7, 10)) %>% 
+  select(inspection_type, boro_code, block, lot, zip_code, latitude, longitude, borough, result, inspection_date, approved_date) %>% 
+  separate(inspection_date, c("inspection_date", "inspection_time"), " ") %>% 
+  separate(inspection_date, c("inspection_year", "inspection_month", "inspection_day"), "-") %>%
+  separate(approved_date, c("approved_date", "approved_time"), " ") %>% 
+  separate(approved_date, c("approved_year", "approved_month", "approved_day"), "-") %>%
+  mutate(inspection_year = as.integer(inspection_year), 
+         inspection_month = as.integer(inspection_month), 
+         inspection_day = as.integer(inspection_day)) %>%
+  mutate(approved_year = as.integer(approved_year), 
+         approved_month = as.integer(approved_month), 
+         approved_day = as.integer(approved_day)) %>%
+  relocate(inspection_year, .before = "inspection_month") %>% 
+  relocate(approved_year, .before = "approved_month") %>%
+  arrange(inspection_year, inspection_month) %>% 
+  mutate(inspection_month = month.abb[inspection_month],
+         approved_month = month.abb[approved_month]) %>% 
+  filter(inspection_year >= 2012 & inspection_year <= 2021)
+```
+
+
+In the next step, we import the weather dataset from NOAA package.
+```{r, message=FALSE, warning=FALSE}
+# Get the Central Park Station id
+nycstationsid = ghcnd_stations() %>% 
+  filter(id == "USW00094728") %>% 
+  distinct(id)
+
+# Pull the desired weather data for Central Park Station
+nyc_weather = meteo_pull_monitors(nycstationsid$id, 
+                             date_min = "2012-01-01", 
+                             date_max = "2021-12-31",
+                             var = c("PRCP", "SNOW", "SNWD", "TMAX", "TMIN"))
+
+nyc_weather_tidy = nyc_weather %>% 
+  janitor::clean_names() %>%
+  separate(date, into = c("year", "month", "day")) %>% 
+  mutate(year = as.numeric(year),
+         month = month.abb[as.numeric(month)],
+         day = as.numeric(day)) %>%
+  mutate(prcp = prcp/10,
+         tmax = tmax/10,
+         tmin = tmin/10) 
+```
+
+
+Merge the rat info with weather info.
+```{r, message=FALSE, warning=FALSE}
+rat_2012_weather = rat_tidy %>% 
+  filter(inspection_year == 2012) %>% 
+  merge(nyc_weather_tidy, by.x = c("inspection_year","inspection_month","inspection_day"), by.y = c("year","month","day")) %>% 
+  select(-id)
+
+rat_2013_weather = rat_tidy %>% 
+  filter(inspection_year == 2013) %>% 
+  merge(nyc_weather_tidy, by.x = c("inspection_year","inspection_month","inspection_day"), by.y = c("year","month","day")) %>% 
+  select(-id)
+
+rat_2014_weather = rat_tidy %>% 
+  filter(inspection_year == 2014) %>% 
+  merge(nyc_weather_tidy, by.x = c("inspection_year","inspection_month","inspection_day"), by.y = c("year","month","day")) %>% 
+  select(-id)
+
+rat_2015_weather = rat_tidy %>% 
+  filter(inspection_year == 2015) %>% 
+  merge(nyc_weather_tidy, by.x = c("inspection_year","inspection_month","inspection_day"), by.y = c("year","month","day")) %>% 
+  select(-id)
+
+rat_2016_weather = rat_tidy %>% 
+  filter(inspection_year == 2016) %>% 
+  merge(nyc_weather_tidy, by.x = c("inspection_year","inspection_month","inspection_day"), by.y = c("year","month","day")) %>% 
+  select(-id)
+
+rat_2017_weather = rat_tidy %>% 
+  filter(inspection_year == 2017) %>% 
+  merge(nyc_weather_tidy, by.x = c("inspection_year","inspection_month","inspection_day"), by.y = c("year","month","day")) %>% 
+  select(-id)
+
+rat_2018_weather = rat_tidy %>% 
+  filter(inspection_year == 2018) %>% 
+  merge(nyc_weather_tidy, by.x = c("inspection_year","inspection_month","inspection_day"), by.y = c("year","month","day")) %>% 
+  select(-id)
+
+rat_2019_weather = rat_tidy %>% 
+  filter(inspection_year == 2019) %>% 
+  merge(nyc_weather_tidy, by.x = c("inspection_year","inspection_month","inspection_day"), by.y = c("year","month","day")) %>% 
+  select(-id)
+
+rat_2020_weather = rat_tidy %>% 
+  filter(inspection_year == 2020) %>% 
+  merge(nyc_weather_tidy, by.x = c("inspection_year","inspection_month","inspection_day"), by.y = c("year","month","day")) %>% 
+  select(-id)
+
+rat_2021_weather = rat_tidy %>% 
+  filter(inspection_year == 2021) %>% 
+  merge(nyc_weather_tidy, by.x = c("inspection_year","inspection_month","inspection_day"), by.y = c("year","month","day")) %>% 
+  select(-id)
+```
+
+
+Thirdly, we import the covid dataset.
+```{r, message=FALSE, warning=FALSE}
+url_covid = "https://data.cityofnewyork.us/OData.svc/rc75-m7u3"
+covid = read.socrata(url_covid) %>% 
+  janitor::clean_names() 
+
+covid_tidy = covid %>%
+  rename(date = date_of_interest) %>% 
+  select(date, contains("case_count")) %>% 
+  select(-contains(c("probable_case_count", "case_count_7day_avg", "all_case_count_7day_avg"))) %>%
+  separate(date, into = c("year", "month", "day")) %>% 
+  mutate(year = as.numeric(year),
+         month = month.abb[as.numeric(month)],
+         day = as.numeric(day)) %>%
+  pivot_longer(
+    cols = bx_case_count:si_case_count,
+    names_to = "borough",
+    values_to = "borough_case_count"
+  ) %>% 
+  mutate(borough = gsub("_case_count", "", borough)) %>% 
+  mutate(borough = recode(borough, "bx" = "Bronx","bk" = "Brooklyn","mn" = "Manhattan","si" = "Staten Island","qn" = "Queens")) %>% 
+  relocate(case_count, .after = borough_case_count) %>% 
+  rename(total_case_count = case_count) 
+```
+
+
+Merge the above dataframe with covid info.
+```{r, message=FALSE, warning=FALSE}
+rat_weather_covid = rat_tidy %>% 
+  filter(inspection_year == 2020 || 2021) %>% 
+  merge(nyc_weather_tidy, by.x = c("inspection_year","inspection_month","inspection_day"), by.y = c("year","month","day")) %>% 
+  select(-id) %>% 
+  merge(covid_tidy, by.x = c("inspection_year","inspection_month","inspection_day","borough"), by.y = c("year","month","day","borough"))
+```
+
+
+Since the raw dataset is too large, we will export the tidied dataset which is merged with weather info and covid info for further use.
+```{r, message=FALSE, warning=FALSE}
+write.csv(rat_2012_weather,"rat_2012.csv")
+write.csv(rat_2013_weather,"rat_2013.csv")
+write.csv(rat_2014_weather,"rat_2014.csv")
+write.csv(rat_2015_weather,"rat_2015.csv")
+write.csv(rat_2016_weather,"rat_2016.csv")
+write.csv(rat_2017_weather,"rat_2017.csv")
+write.csv(rat_2018_weather,"rat_2018.csv")
+write.csv(rat_2019_weather,"rat_2019.csv")
+write.csv(rat_2020_weather,"rat_2020.csv")
+write.csv(rat_2021_weather,"rat_2021.csv")
+write.csv(rat_weather_covid,"rat_weather_covid.csv")
+```
+
