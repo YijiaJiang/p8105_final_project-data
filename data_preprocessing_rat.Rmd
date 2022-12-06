@@ -23,12 +23,12 @@ rat = read.socrata(url_rat) %>%
 Then we clean the date and keep the records between 2013 and 2021. All missing data are dropped.
 ```{r, message=FALSE, warning=FALSE}
 rat_tidy = rat %>%
-  select(inspection_type, bbl, zip_code, latitude, longitude, borough, result, inspection_date, approved_date) %>%
+  select(inspection_type, bbl, zip_code, street_name, latitude, longitude, borough, result, inspection_date, approved_date) %>%
   drop_na() %>% 
   mutate(boro_code = substr(bbl, 1, 1),
          block = substr(bbl, 2, 6),
          lot = substr(bbl, 7, 10)) %>% 
-  select(inspection_type, boro_code, block, lot, zip_code, latitude, longitude, borough, result, inspection_date, approved_date) %>% 
+  select(inspection_type, boro_code, block, lot, zip_code, street_name, latitude, longitude, borough, result, inspection_date, approved_date) %>% 
   separate(inspection_date, c("inspection_date", "inspection_time"), " ") %>% 
   separate(inspection_date, c("inspection_year", "inspection_month", "inspection_day"), "-") %>%
   separate(approved_date, c("approved_date", "approved_time"), " ") %>% 
